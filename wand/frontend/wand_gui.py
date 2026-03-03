@@ -58,8 +58,7 @@ class WandGUI():
         init_logger_from_args(args)
 
         if args.log_to_file:
-            log_file = pkg_resources.resource_filename("wand", "log.txt")
-            fh = logging.FileHandler(log_file, mode="wt")
+            fh = logging.FileHandler("log.txt", mode="wt")
             fh.setLevel(logger.getEffectiveLevel())
             logger.addHandler(fh)
             logging.getLogger("qasync").addHandler(fh)
