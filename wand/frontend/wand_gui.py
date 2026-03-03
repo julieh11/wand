@@ -1,7 +1,7 @@
 """ Wavelength Analysis 'Nd Display GUI """
 import argparse
+import importlib.resources
 import logging
-import pkg_resources
 import sys
 import traceback
 import asyncio
@@ -81,9 +81,10 @@ class WandGUI():
         atexit.register(self.loop.close)
 
         # set program icon
-        icon = QtGui.QIcon()
-        icon.addFile(pkg_resources.resource_filename("wand", "wand.svg"))
-        self.qapp.setWindowIcon(icon)
+        svg_data = importlib.resources.files("wand").joinpath("wand.svg").read_bytes()
+        pixmap = QtGui.QPixmap()
+        pixmap.loadFromData(svg_data)
+        self.qapp.setWindowIcon(QtGui.QIcon(pixmap))
 
         # create main window
         self.win = MainWindow()
