@@ -35,7 +35,7 @@ The server can be run in "simulation" mode without hardware access by using the 
 
 If you get `connection refused` errors when a client tries to connect to the server remember to make sure to add a suitable bind argument (e.g. `--bind=*`).
 
-The default server port is `3251`. To control the server (e.g. to lock a laser or configure a lock gain), or list the methods provided by the server, use `artiq_rpctool`.
+The default server port is `3251`. To control the server (e.g. to lock a laser or configure a lock gain), or list the methods provided by the server, use `sipyco_rpctool`.
 
 ## OSAs
 
