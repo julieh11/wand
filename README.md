@@ -16,9 +16,14 @@ Since many applications can tolerate data that is slightly old, the server store
 
 ## Installation
 
-From inside Oxford, this is installed as part of the `artiq-oitg` Poetry meta-package.
+WAnD uses the standard `pyproject.toml` mechanism and can be installed using the package management tool of your choice ([`uv`](https://docs.astral.sh/uv) is strongly recommended). Dependencies only necessary for some of the components are provided in the `gui`, `server` and `influxdb` extras, which can be accessed using Python's standard square bracket syntax (e.g. `wand[gui]`).
 
-From outside Oxford, use Pip to install into an [ARTIQ](https://github.com/m-labs/artiq) Conda environment. You may also need to Pip install a couple of extra packages like `pydaqmx`.
+For instance, to directly run the latest version of the WaND GUI from GitHub without manually installing it, you could use:
+```
+uvx --from git+https://github.com/OxfordIonTrapGroup/wand[gui] wand_gui -b <backup_dir> -n <name> -v
+```
+
+From inside Oxford, WAnD is also installed as part of the `artiq-oitg` Poetry meta-package.
 
 ## WAnD servers
 
