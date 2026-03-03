@@ -1,0 +1,7 @@
+line-length = 88
+
+[format]
+line-ending = "lf"
+
+[lint]
+extend-select = ["I"]

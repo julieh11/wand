@@ -1,42 +1,50 @@
-import logging
-import time
-import numpy as np
-import platform
 import ctypes
-from ctypes import (POINTER, byref, cast, wintypes,
-                    c_bool, c_double, c_int16, c_long, c_ushort, c_void_p)
+import logging
+import platform
+import time
+from ctypes import (
+    POINTER,
+    byref,
+    c_bool,
+    c_double,
+    c_int16,
+    c_long,
+    c_ushort,
+    c_void_p,
+    cast,
+    wintypes,
+)
 
-from wand.tools import WLMMeasurementStatus
+import numpy as np
+
 from wand.drivers import wlm_constants as wlm
+from wand.tools import WLMMeasurementStatus
 
 # These wavelength ranges do not match those in the documentation, but are
 # extracted from the one multi-range WS6 we have access to
-WavelengthRange = {
-    "VIS_NIR": 6,
-    "IR": 7
-}
+WavelengthRange = {"VIS_NIR": 6, "IR": 7}
 
 logger = logging.getLogger(__name__)
 
 
 class WLMException(Exception):
-    """ Raised on errors involving the WLM interface library (windata.dll) """
+    """Raised on errors involving the WLM interface library (windata.dll)"""
+
     pass
 
 
 class WLM:
-    """" Driver for HighFinesse WaveLength Meters (WLM) """
+    """ " Driver for HighFinesse WaveLength Meters (WLM)"""
+
     def __init__(self, simulation):
         self.active_switch_ch = 1
 
         try:
-            
-            if platform.system() == 'Windows':
+            if platform.system() == "Windows":
                 self.lib = lib = ctypes.windll.wlmData
-            elif platform.system() == 'Linux':
+            elif platform.system() == "Linux":
                 self.lib = lib = ctypes.CDLL("libwlmData.so")
 
-            
         except Exception as e:
             raise WLMException("Failed to load WLM DLL: {}".format(e)) from e
 
@@ -68,17 +76,18 @@ class WLM:
         # Check the WLM server application is running and start it if necessary
         if not lib.Instantiate(wlm.cInstCheckForWLM, 0, 0, 0):
             logger.info("Starting WLM server")
-            res = lib.ControlWLMEx(wlm.cCtrlWLMShow | wlm.cCtrlWLMWait,
-                                   0, 0, 10000, 1)
+            res = lib.ControlWLMEx(wlm.cCtrlWLMShow | wlm.cCtrlWLMWait, 0, 0, 10000, 1)
             codes = wlm.control_wlm_to_str(res)
             if "flServerStarted" not in codes:
-                raise WLMException("Error starting WLM server application : "
-                                   "{}".format(codes))
+                raise WLMException(
+                    "Error starting WLM server application : {}".format(codes)
+                )
             for code in codes:
                 if code == "flServerStarted":
                     continue
-                logger.warning("Unexpected return code from ControlWLMEx: {} "
-                               .format(code))
+                logger.warning(
+                    "Unexpected return code from ControlWLMEx: {} ".format(code)
+                )
 
         logger.info("Connected to WLM server")
 
@@ -88,8 +97,7 @@ class WLM:
         self.wlm_fw_build = lib.GetWLMVersion(3)
 
         if self.wlm_model < 5 or self.wlm_model > 9:
-            raise WLMException("Unrecognised WLM model: {}".format(
-                self.wlm_model))
+            raise WLMException("Unrecognised WLM model: {}".format(self.wlm_model))
 
         # WS/6 have 1, WS/7 & WS/8 & WS/U have 2
         self._num_ccds = 2 if self.wlm_model >= 7 else 1
@@ -109,27 +117,31 @@ class WLM:
         if lib.GetOperationState(0) == wlm.cStop:
             self.set_measurement_enabled(True)
 
-        if self._num_channels > 1 and \
-           lib.SetSwitcherMode(0) < 0:  # disable automatic channel switching
+        if (
+            self._num_channels > 1 and lib.SetSwitcherMode(0) < 0
+        ):  # disable automatic channel switching
             logger.warning("Unable to disable automatic WLM switching")
 
         if self._num_ccds == 1:
             self._exp_min = [lib.GetExposureRange(wlm.cExpoMin)]
             self._exp_max = [lib.GetExposureRange(wlm.cExpoMax)]
         elif self._num_ccds == 2:
-            self._exp_min = [lib.GetExposureRange(wlm.cExpoMin),
-                             lib.GetExposureRange(wlm.cExpo2Min)
-                             ]
-            self._exp_max = [lib.GetExposureRange(wlm.cExpoMax),
-                             lib.GetExposureRange(wlm.cExpo2Max)
-                             ]
+            self._exp_min = [
+                lib.GetExposureRange(wlm.cExpoMin),
+                lib.GetExposureRange(wlm.cExpo2Min),
+            ]
+            self._exp_max = [
+                lib.GetExposureRange(wlm.cExpoMax),
+                lib.GetExposureRange(wlm.cExpo2Max),
+            ]
         else:
             raise NotImplementedError("Number of CCDs not supported")
 
         self._exposure = self._exp_min.copy()
-        self._set_exp = [[lib.GetExposureNum(ch + 1, 1),
-                          lib.GetExposureNum(ch + 1, 2)]
-                         for ch in range(self._num_channels)]
+        self._set_exp = [
+            [lib.GetExposureNum(ch + 1, 1), lib.GetExposureNum(ch + 1, 2)]
+            for ch in range(self._num_channels)
+        ]
 
         self._wavelength_range = None
 
@@ -138,12 +150,16 @@ class WLM:
                 logger.warning("Error setting WLM exposure mode")
 
             # hook up wait for event mechanism
-        self.lib.Instantiate(
-            wlm.cInstNotification, wlm.cNotifyRemoveWaitEvent, 0, 0)
-        if self.lib.Instantiate(wlm.cInstNotification,
-                                wlm.cNotifyInstallWaitEvent,
-                                c_long(max(self._exp_max) + 100),  # timeout
-                                0) == 0:
+        self.lib.Instantiate(wlm.cInstNotification, wlm.cNotifyRemoveWaitEvent, 0, 0)
+        if (
+            self.lib.Instantiate(
+                wlm.cInstNotification,
+                wlm.cNotifyInstallWaitEvent,
+                c_long(max(self._exp_max) + 100),  # timeout
+                0,
+            )
+            == 0
+        ):
             raise WLMException("Error hooking up WLM callbacks")
 
         # set to manual measurement control
@@ -151,8 +167,7 @@ class WLM:
         self._trigger_single_measurement()
 
         # get size of interferometer data arrays
-        self._pattern_count = self.lib.GetPatternItemCount(
-            wlm.cSignal1Interferometers)
+        self._pattern_count = self.lib.GetPatternItemCount(wlm.cSignal1Interferometers)
         if self._pattern_count == 0:
             raise WLMException("Error finding the interferometer data length")
         pattern_size = self.lib.GetPatternItemSize(wlm.cSignal1Interferometers)
@@ -165,25 +180,31 @@ class WLM:
         if hasattr(lib, "GetAveragingSettingNum"):
             for ch in range(self._num_channels):
                 if lib.GetAveragingSettingNum(ch + 1, wlm.cmiAveragingCount, 0) != 1:
-                    logger.warning(f"Averaging was enabled on channel {ch + 1}, disabling")
+                    logger.warning(
+                        f"Averaging was enabled on channel {ch + 1}, disabling"
+                    )
                     if lib.SetAveragingSettingNum(ch + 1, wlm.cmiAveragingCount, 1) < 0:
-                        raise WLMException(f"Error disabling averaging on channel {ch + 1}")
+                        raise WLMException(
+                            f"Error disabling averaging on channel {ch + 1}"
+                        )
         else:
-            logger.warning("WLM software version does not have averaging API; ensure it is disabled")
+            logger.warning(
+                "WLM software version does not have averaging API; ensure it is disabled"
+            )
 
         logger.info("Connected to " + self.identify())
 
     def identify(self):
-        """ :returns: WLM identification string """
+        """:returns: WLM identification string"""
         if self.simulation:
             return "WLM simulator"
 
         return "WLM {} rev {}, firmware {}.{}".format(
-            self.wlm_model, self.wlm_hw_rev, self.wlm_fw_rev,
-            self.wlm_fw_build)
+            self.wlm_model, self.wlm_hw_rev, self.wlm_fw_rev, self.wlm_fw_build
+        )
 
     def set_measurement_enabled(self, enabled):
-        """ :param enabled: if True, we enable WLM measurement mode """
+        """:param enabled: if True, we enable WLM measurement mode"""
         if self.simulation:
             return
 
@@ -192,18 +213,17 @@ class WLM:
             raise WLMException("Error starting WLM measuremnts")
 
     def get_temperature(self):
-        """ Returns the temperature of the wavemeter in C """
+        """Returns the temperature of the wavemeter in C"""
         if self.simulation:
             return 25.0
 
         temp = self.lib.GetTemperature(0)
         if temp < 0:
-            raise WLMException(
-                "Error reading WLM temperature: {}".format(temp))
+            raise WLMException("Error reading WLM temperature: {}".format(temp))
         return temp
 
     def get_pressure(self):
-        """ Returns the pressure inside the wavemeter in mBar
+        """Returns the pressure inside the wavemeter in mBar
         :raises WLMException: with an error code of -1006 if the wavemeter does
           not support pressure measurements
         """
@@ -212,12 +232,11 @@ class WLM:
 
         pressure = self.lib.GetPressure(0)
         if pressure < 0:
-            raise WLMException(
-                "Error reading WLM pressure: {}". format(pressure))
+            raise WLMException("Error reading WLM pressure: {}".format(pressure))
         return pressure
 
     def _update_exposure(self, exposure=None, block=True):
-        """ Updates the WLM exposure times:
+        """Updates the WLM exposure times:
 
         :param exposure: if None then we use self._exposure, otherwise this
         should be a list of exposure times to set.
@@ -232,21 +251,24 @@ class WLM:
             self._set_exp[self.active_switch_ch - 1][ccd] = exp
 
             if 0 > self.lib.SetExposureNum(self.active_switch_ch, ccd + 1, exp):
-                raise WLMException("Unable to set WLM exposure time for ccd {}"
-                                   " to {} ms".format(ccd, exp))
+                raise WLMException(
+                    "Unable to set WLM exposure time for ccd {} to {} ms".format(
+                        ccd, exp
+                    )
+                )
             max_ccd_changed = ccd
 
         if max_ccd_changed == -1:
             return
 
-        event = vars(wlm)["cmiExposureValue{}{}".format(max_ccd_changed + 1,
-                                                        self.active_switch_ch)]
+        event = vars(wlm)[
+            "cmiExposureValue{}{}".format(max_ccd_changed + 1, self.active_switch_ch)
+        ]
         if block:
             self._wait_for_event([event], exposure[max_ccd_changed])
 
     def _update_wavelength_range(self):
-        """ Updates the selected WLM wavelength range
-        """
+        """Updates the selected WLM wavelength range"""
         if self._wavelength_range is None:
             # Use the default range
             return
@@ -261,7 +283,7 @@ class WLM:
         #         self._wavelength_range))
 
     def _get_fresh_data(self):
-        """ Gets a "fresh" wavelength measurement, guaranteed to occur after
+        """Gets a "fresh" wavelength measurement, guaranteed to occur after
         this method was called.
 
         The WLM has an (undocumented) internal measurement pipeline three
@@ -286,23 +308,22 @@ class WLM:
         if self.lib.TriggerMeasurement(wlm.cCtrlMeasurementTriggerSuccess):
             raise WLMException("Error triggering WLM measurement cycle")
 
-        self._wait_for_event([wlm.cmiTriggerState],
-                             wlm.cCtrlMeasurementTriggerSuccess)
+        self._wait_for_event([wlm.cmiTriggerState], wlm.cCtrlMeasurementTriggerSuccess)
 
     def _wait_for_event(self, event_values, int_value):
-        """ Wait for a WLM event to occur """
+        """Wait for a WLM event to occur"""
         event = c_long()
         p_int = c_long()
         p_double = c_double()
         ret = 0
 
-        logger.debug("Waiting for WLM event %s...", [wlm.event_to_str(e) for e in event_values])
+        logger.debug(
+            "Waiting for WLM event %s...", [wlm.event_to_str(e) for e in event_values]
+        )
 
         t0 = time.time()
         while True:
-            ret = self.lib.WaitForWLMEvent(byref(event),
-                                           byref(p_int),
-                                           byref(p_double))
+            ret = self.lib.WaitForWLMEvent(byref(event), byref(p_int), byref(p_double))
             if ret == -1:
                 ret_str = "Timeout"
             elif ret == 1:
@@ -310,15 +331,19 @@ class WLM:
             elif ret == 2:
                 ret_str = "pipeline empty"
             else:
-                raise WLMException("Unexpected return from WaitForWLMEvent"
-                                   ": {}".format(ret))
+                raise WLMException(
+                    "Unexpected return from WaitForWLMEvent: {}".format(ret)
+                )
 
-            logger.debug("{} ms: {}, current state='{}' ({}, {})".format(
-                1e3 * (time.time() - t0),
-                ret_str,
-                wlm.event_to_str(event),
-                p_int.value,
-                p_double.value))
+            logger.debug(
+                "{} ms: {}, current state='{}' ({}, {})".format(
+                    1e3 * (time.time() - t0),
+                    ret_str,
+                    wlm.event_to_str(event),
+                    p_int.value,
+                    p_double.value,
+                )
+            )
 
             if ret == -1:
                 raise WLMException("Timeout while waiting for event")
@@ -333,7 +358,7 @@ class WLM:
         logger.debug("...done")
 
     def get_frequency(self):
-        """ Returns the frequency of the active channel.
+        """Returns the frequency of the active channel.
 
         The frequency measurement is guaranteed to occur after this method is
         called. See :meth _get_fresh_data: for details.
@@ -361,12 +386,11 @@ class WLM:
         elif freq == wlm.ErrLowSignal:
             return WLMMeasurementStatus.UNDER_EXPOSED, 0
         else:
-            logger.error("error getting frequency: {}"
-                         .format(wlm.error_to_str(freq)))
+            logger.error("error getting frequency: {}".format(wlm.error_to_str(freq)))
             return WLMMeasurementStatus.ERROR, 0
 
     def get_exposure_min(self):
-        """ Returns the minimum exposure times in ms """
+        """Returns the minimum exposure times in ms"""
         # HACK! see issue #41
         # 1ms exposures don't seem to work, so treat 1ms as 0ms
         if self._num_ccds == 2 and self._exp_min[1] == 0:
@@ -374,15 +398,15 @@ class WLM:
         return self._exp_min
 
     def get_exposure_max(self):
-        """ Returns the maximum exposure times in ms """
+        """Returns the maximum exposure times in ms"""
         return self._exp_max
 
     def get_num_ccds(self):
-        """ Returns the number of CCDs on the WLM """
+        """Returns the number of CCDs on the WLM"""
         return self._num_ccds
 
     def set_exposure(self, exposure, ccd):
-        """ Sets the exposure time for the active channel
+        """Sets the exposure time for the active channel
 
         :param exposure: exposure time (ms)
         :param ccd: the WLM ccd to set the exposure for. Must lie in
@@ -396,14 +420,15 @@ class WLM:
             exposure = 0
 
         if exposure < self._exp_min[ccd] or exposure > self._exp_max[ccd]:
-            raise WLMException("Invalid WLM exposure for ccd {}: {} ms"
-                               .format(ccd, exposure))
+            raise WLMException(
+                "Invalid WLM exposure for ccd {}: {} ms".format(ccd, exposure)
+            )
         if ccd not in range(self._num_ccds):
             raise WLMException("Invalid ccd: {}".format(ccd))
         self._exposure[ccd] = exposure
 
     def set_wavelength_range(self, range_):
-        """ Sets the wavelength range for the active channel
+        """Sets the wavelength range for the active channel
 
         :param range_: wavelength range as a string (indexes in WavelengthRange
         global)
@@ -412,38 +437,41 @@ class WLM:
         try:
             self._wavelength_range = WavelengthRange[range_]
         except KeyError:
-            raise WLMException("Invalid wavelength range \'{}\' - valid choices are {}"
-                               .format(range_, ",".join(WavelengthRange.keys())))
+            raise WLMException(
+                "Invalid wavelength range '{}' - valid choices are {}".format(
+                    range_, ",".join(WavelengthRange.keys())
+                )
+            )
 
     def get_fringe_peak(self, ccd):
-        """ Returns the peak height of the interference pattern normalized
-        to full scale. Used for auto exposure etc """
+        """Returns the peak height of the interference pattern normalized
+        to full scale. Used for auto exposure etc"""
         if ccd not in range(self._num_ccds):
             raise WLMException("Invalid ccd: {}".format(ccd))
         if self.simulation:
             return 0.5
 
-        peak = self.lib.GetAmplitudeNum(self.active_switch_ch,
-                                        [wlm.cMax1, wlm.cMax2][ccd], 0)
+        peak = self.lib.GetAmplitudeNum(
+            self.active_switch_ch, [wlm.cMax1, wlm.cMax2][ccd], 0
+        )
         if peak < 0:
-            logger.error("error getting peak height: {}"
-                         .format(wlm.error_to_str(peak)))
+            logger.error("error getting peak height: {}".format(wlm.error_to_str(peak)))
             return WLMMeasurementStatus.ERROR, 0
-        return peak / 3500.
+        return peak / 3500.0
 
     def get_switch(self):
-        """ :returns: an interface to the WLM integrated switch """
+        """:returns: an interface to the WLM integrated switch"""
         return self.Switch(self)
 
     def get_pattern(self):
-        """ :returns: the interferometer pattern """
+        """:returns: the interferometer pattern"""
         if self.simulation:
             num_samples = 1024
             x = np.arange(num_samples) + np.random.uniform(-0.05, +0.05)
             x *= num_samples
             x -= num_samples / 2
             trace = np.random.normal(loc=0, scale=0.05, size=num_samples)
-            trace += 900. / ((x) ** 2 + 1000)
+            trace += 900.0 / ((x) ** 2 + 1000)
 
             trace -= min(trace)
             trace /= max(trace)
@@ -451,35 +479,32 @@ class WLM:
             return trace
 
         if not self._interferometer_enabled:
-            if self.lib.SetPattern(wlm.cSignal1Interferometers,
-                                   wlm.cPatternEnable
-                                   ) < 0:
+            if self.lib.SetPattern(wlm.cSignal1Interferometers, wlm.cPatternEnable) < 0:
                 raise WLMException("Error enabling interferometer export")
             self._interferometer_enabled = True
 
         raw_data = (wintypes.DWORD * self._pattern_count)()
-        ret = self.lib.GetPatternDataNum(self.active_switch_ch,
-                                         wlm.cSignal1Interferometers,
-                                         raw_data)
+        ret = self.lib.GetPatternDataNum(
+            self.active_switch_ch, wlm.cSignal1Interferometers, raw_data
+        )
         if ret < 0:
-            raise WLMException(
-                "Unable to get interferometer pattern: {}".format(ret)
-            )
+            raise WLMException("Unable to get interferometer pattern: {}".format(ret))
 
         data_p = cast(raw_data, POINTER(self._pattern_dtype * self._pattern_count))
         return np.ctypeslib.as_array(data_p.contents)
 
     class Switch:
-        """ High-Finesse fibre switch controlled by the WLM """
+        """High-Finesse fibre switch controlled by the WLM"""
+
         def __init__(self, wlm):
             self._wlm = wlm
 
         def get_num_channels(self):
-            """ Returns the number of channels on the switch """
+            """Returns the number of channels on the switch"""
             return self._wlm._num_channels
 
         def set_active_channel(self, channel):
-            """ Sets the active channel.
+            """Sets the active channel.
 
             :param channel: the channel number to select, not zero-indexed
             """
@@ -493,8 +518,7 @@ class WLM:
             ret = self._wlm.lib.SetSwitcherChannel(channel)
             if ret < 0:
                 raise WLMException(
-                    "Unable to set WLM switcher channel {}  to: {}".format(
-                        channel, ret)
+                    "Unable to set WLM switcher channel {}  to: {}".format(channel, ret)
                 )
             try:
                 self._wlm._wait_for_event([wlm.cmiSwitcherChannel], channel)
@@ -502,13 +526,12 @@ class WLM:
                 logger.error("Error changing switcher channel: {}".format(e))
 
         def get_active_channel(self):
-            """ Returns the active channel number
+            """Returns the active channel number
             :return: the active channel, not zero-indexed
             """
             if self._wlm.simulation:
                 return 1
             channel = self._wlm.lib.GetSwitcherChannel(0)
             if channel < 0 or channel > self._wlm._num_channels:
-                raise WLMException("Unable to query active WLM switcher "
-                                   "channel")
+                raise WLMException("Unable to query active WLM switcher channel")
             return channel

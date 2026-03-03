@@ -1,19 +1,17 @@
 import asyncio
-import logging
-import numpy as np
-import time
 import functools
+import logging
+import time
 
+import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.dockarea as dock
 
 # Use pyqtgraph's Qt version detection to select between Qt5 and Qt6.
 from pyqtgraph import QtGui, QtWidgets
-
 from sipyco.pc_rpc import AsyncioClient as RPCClient
 
 from wand.tools import WLMMeasurementStatus
-
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,7 @@ FAST_MODE_PRIORITY = 2
 
 
 class LaserDisplay:
-    """ Diagnostics for one laser """
+    """Diagnostics for one laser"""
 
     def __init__(self, display_name, gui):
         self.connected = False
@@ -49,9 +47,9 @@ class LaserDisplay:
         self.name.setText(display_name, color="#FFFFFF", size="32pt")
 
         self.osa = pg.PlotItem()
-        self.osa.hideAxis('bottom')
+        self.osa.hideAxis("bottom")
         self.osa.showGrid(y=True)
-        self.osa_curve = self.osa.plot(pen='y', color=self.colour)
+        self.osa_curve = self.osa.plot(pen="y", color=self.colour)
 
         self.fast_mode = QtWidgets.QCheckBox("Fast mode")
         self.auto_exposure = QtWidgets.QCheckBox("Auto expose")
@@ -68,7 +66,7 @@ class LaserDisplay:
         self.f_ref.setSuffix(" THz")
         self.f_ref.setDecimals(7)
         self.f_ref.setSingleStep(1e-6)
-        self.f_ref.setRange(0., 1000.)
+        self.f_ref.setRange(0.0, 1000.0)
 
         # context menu
         self.menu = QtWidgets.QMenu()
@@ -77,8 +75,7 @@ class LaserDisplay:
         self.menu.addAction(self.ref_editable)
 
         for label in [self.detuning, self.name, self.frequency, self.f_ref]:
-            label.contextMenuEvent = lambda ev: self.menu.popup(
-                QtGui.QCursor.pos())
+            label.contextMenuEvent = lambda ev: self.menu.popup(QtGui.QCursor.pos())
             label.mouseReleaseEvent = lambda ev: None
 
         # layout GUI
@@ -122,21 +119,19 @@ class LaserDisplay:
             self.wake_loop.set()
 
         self.ref_editable.triggered.connect(self.ref_editable_cb)
-        self.fast_mode.clicked.connect(functools.partial(add_async_cb,
-                                                         ("fast_mode",)))
-        self.auto_exposure.clicked.connect(functools.partial(add_async_cb,
-                                                             ("auto_expose",)))
-        self.f_ref.valueChanged.connect(functools.partial(add_async_cb,
-                                                          ("f_ref",)))
+        self.fast_mode.clicked.connect(functools.partial(add_async_cb, ("fast_mode",)))
+        self.auto_exposure.clicked.connect(
+            functools.partial(add_async_cb, ("auto_expose",))
+        )
+        self.f_ref.valueChanged.connect(functools.partial(add_async_cb, ("f_ref",)))
         for ccd, exp in enumerate(self.exposure):
-            exp.valueChanged.connect(functools.partial(add_async_cb,
-                                                       ("exposure", ccd)))
+            exp.valueChanged.connect(functools.partial(add_async_cb, ("exposure", ccd)))
 
         self.fut = asyncio.ensure_future(self.loop())
         self._gui.loop.run_until_complete(self.setConnected(False))
 
     async def setConnected(self, connected):
-        """ Enable/disable controls on the gui dependent on whether or not
+        """Enable/disable controls on the gui dependent on whether or not
         the server is connected.
         """
         if not connected:
@@ -162,16 +157,15 @@ class LaserDisplay:
             self.wake_loop.set()
 
         else:
-            self.colour = self._gui.laser_db[self.laser].get("display_colour",
-                                                             "#7C7C7C")
+            self.colour = self._gui.laser_db[self.laser].get(
+                "display_colour", "#7C7C7C"
+            )
             if self.colour == "red":
                 self.colour = "#FF5555"
             elif self.colour == "blue":
                 self.colour = "#5555FF"
 
-            self.name.setText(self.display_name,
-                              color=self.colour,
-                              size="32pt")
+            self.name.setText(self.display_name, color=self.colour, size="32pt")
 
             try:
                 exp_min = await self.client.get_min_exposures()
@@ -185,8 +179,7 @@ class LaserDisplay:
 
             for ccd, exposure in enumerate(self.exposure[:num_ccds]):
                 exposure.setRange(exp_min[ccd], exp_max[ccd])
-                exposure.setValue(
-                    self._gui.laser_db[self.laser]["exposure"][ccd])
+                exposure.setValue(self._gui.laser_db[self.laser]["exposure"][ccd])
 
             # sync GUI with server
             self.update_fast_mode()
@@ -214,7 +207,7 @@ class LaserDisplay:
         self.connected = connected
 
     async def loop(self):
-        """ Update task for this laser display.
+        """Update task for this laser display.
 
         Runs as long as the parent window's exit request is not set.
 
@@ -240,9 +233,9 @@ class LaserDisplay:
             try:
                 server_cfg = self._gui.config["servers"][self.server]
                 self.client = RPCClient()
-                await self.client.connect_rpc(server_cfg["host"],
-                                              server_cfg["control"],
-                                              target_name="control")
+                await self.client.connect_rpc(
+                    server_cfg["host"], server_cfg["control"], target_name="control"
+                )
                 await self.setConnected(True)
             # to do: catch specific exceptions
             except Exception:
@@ -274,16 +267,23 @@ class LaserDisplay:
                         poll_time = self.poll_time
                         priority = REGULAR_UPDATE_PRIORITY
 
-                    data_timestamp = min(self._gui.freq_db[laser]["timestamp"],
-                                         self._gui.osa_db[laser]["timestamp"])
+                    data_timestamp = min(
+                        self._gui.freq_db[laser]["timestamp"],
+                        self._gui.osa_db[laser]["timestamp"],
+                    )
 
                     data_expiry = data_timestamp + poll_time
                     next_measurement_in = data_expiry - time.time()
                     if next_measurement_in <= 0:
                         try:
                             await self.client.get_freq(
-                                laser=laser, age=poll_time, priority=priority,
-                                get_osa_trace=True, blocking=True, mute=True)
+                                laser=laser,
+                                age=poll_time,
+                                priority=priority,
+                                get_osa_trace=True,
+                                blocking=True,
+                                mute=True,
+                            )
                             next_measurement_in = poll_time
                         except (OSError, AttributeError):
                             self.server = ""
@@ -294,27 +294,26 @@ class LaserDisplay:
                     continue
 
                 try:
-                    await asyncio.wait_for(self.wake_loop.wait(),
-                                           next_measurement_in)
+                    await asyncio.wait_for(self.wake_loop.wait(), next_measurement_in)
                 except asyncio.TimeoutError:
                     pass
 
     async def fast_mode_cb(self):
         try:
-            await self.client.set_fast_mode(self.laser,
-                                            self.fast_mode.isChecked())
+            await self.client.set_fast_mode(self.laser, self.fast_mode.isChecked())
         except (OSError, AttributeError):
             await self.setConnected(False)
 
     async def auto_expose_cb(self):
         try:
-            await self.client.set_auto_exposure(self.laser,
-                                                self.auto_exposure.isChecked())
+            await self.client.set_auto_exposure(
+                self.laser, self.auto_exposure.isChecked()
+            )
         except (OSError, AttributeError):
             await self.setConnected(False)
 
     def ref_editable_cb(self):
-        """ Enable/disable editing of the frequency reference """
+        """Enable/disable editing of the frequency reference"""
         if not self.ref_editable.isChecked():
             self.f_ref.setEnabled(False)
         else:
@@ -322,16 +321,13 @@ class LaserDisplay:
 
     async def f_ref_cb(self):
         try:
-            await self.client.set_reference_freq(self.laser,
-                                                 self.f_ref.value() * 1e12)
+            await self.client.set_reference_freq(self.laser, self.f_ref.value() * 1e12)
         except (OSError, AttributeError):
             await self.setConnected(False)
 
     async def exposure_cb(self, ccd):
         try:
-            await self.client.set_exposure(self.laser,
-                                           self.exposure[ccd].value(),
-                                           ccd)
+            await self.client.set_exposure(self.laser, self.exposure[ccd].value(), ccd)
         except (OSError, AttributeError):
             await self.setConnected(False)
 
@@ -374,7 +370,6 @@ class LaserDisplay:
         self.osa_curve.setData(trace)
 
     def update_freq(self):
-
         freq = self._gui.freq_db[self.laser]["freq"]
         status = self._gui.freq_db[self.laser]["status"]
 

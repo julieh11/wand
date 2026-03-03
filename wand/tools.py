@@ -1,10 +1,10 @@
-from enum import IntEnum
-import os
-import datetime
 import asyncio
-import shutil
+import datetime
 import logging
+import os
+import shutil
 import sys
+from enum import IntEnum
 from pathlib import Path
 
 from sipyco import pyon
@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class WLMMeasurementStatus(IntEnum):
-    OKAY = 0,
-    UNDER_EXPOSED = 1,
-    OVER_EXPOSED = 2,
+    OKAY = (0,)
+    UNDER_EXPOSED = (1,)
+    OVER_EXPOSED = (2,)
     ERROR = 3
 
 
@@ -41,8 +41,7 @@ def get_config_path(args, name_suffix=""):
         raise Exception("Unsupported platform")
 
     if not os.path.exists(data_dir):
-        logger.info("Data directory does not exist, creating at {}".format(
-            data_dir))
+        logger.info("Data directory does not exist, creating at {}".format(data_dir))
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, config_file)
 
@@ -55,7 +54,7 @@ def get_config_path(args, name_suffix=""):
 
 
 def load_config(args, name_suffix=""):
-    """ load configuration file, restoring from backup if necessary cf
+    """load configuration file, restoring from backup if necessary cf
     config_args
     """
     config_path, backup_path = get_config_path(args, name_suffix)
@@ -64,18 +63,21 @@ def load_config(args, name_suffix=""):
         config = pyon.load_file(config_path)
     except FileNotFoundError:
         if not backup_path:
-            logger.error("Server configuration file not found, but network drive " +
-                         "backup path also not set (consider passing --backup-dir)")
+            logger.error(
+                "Server configuration file not found, but network drive "
+                + "backup path also not set (consider passing --backup-dir)"
+            )
             raise
-        logger.warning("Unable to find server configuration file, "
-                       "restoring from backup")
+        logger.warning(
+            "Unable to find server configuration file, restoring from backup"
+        )
         shutil.copyfile(backup_path, config_path)
         config = pyon.load_file(config_path)
     return config
 
 
 def backup_config(args, name_suffix=""):
-    """" Backup server configuration file cf config_args"""
+    """Backup server configuration file cf config_args"""
     config_path, backup_path = get_config_path(args, name_suffix)
 
     try:
@@ -87,13 +89,13 @@ def backup_config(args, name_suffix=""):
 
 
 async def regular_config_backup(args, name_suffix=""):
-    """ asyncio task to backup the server configuration file every day at
+    """asyncio task to backup the server configuration file every day at
     4 am cf backup_config
     """
     while True:
         next_backup = datetime.datetime.now() + datetime.timedelta(days=1)
         next_backup = next_backup.replace(
-            day=next_backup.day, hour=4, minute=0, second=0, microsecond=0)
-        await asyncio.sleep(
-            (next_backup - datetime.datetime.now()).total_seconds())
+            day=next_backup.day, hour=4, minute=0, second=0, microsecond=0
+        )
+        await asyncio.sleep((next_backup - datetime.datetime.now()).total_seconds())
         backup_config(args)

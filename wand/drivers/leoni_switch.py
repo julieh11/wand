@@ -1,11 +1,10 @@
-""" Driver for Leoni eol/mol 1xn fibre switches """
+"""Driver for Leoni eol/mol 1xn fibre switches"""
 
 import socket
 
 
 class LeoniSwitch:
     def __init__(self, ip_addr, simulation=False):
-
         self.simulation = simulation
         if simulation:
             self._num_channels = 16
@@ -18,7 +17,7 @@ class LeoniSwitch:
         self.get_num_channels()
 
     def get_num_channels(self):
-        """ Returns the number of channels on the switch """
+        """Returns the number of channels on the switch"""
         if self.simulation:
             return 16
 
@@ -31,18 +30,18 @@ class LeoniSwitch:
         return self._num_channels
 
     def set_active_channel(self, channel):
-        """ Sets the active channel.
+        """Sets the active channel.
 
         :param channel: the channel number to select, not zero-indexed
         """
         if channel < 1 or channel > self._num_channels:
-            raise ValueError('Channel out of bounds')
+            raise ValueError("Channel out of bounds")
         if self.simulation:
             return
         self.sock.send("ch{}\r\n".format(channel).encode())
 
     def get_active_channel(self):
-        """ Returns the active channel number
+        """Returns the active channel number
         :return: the active channel, not zero-indexed
         """
         if self.simulation:
@@ -53,7 +52,7 @@ class LeoniSwitch:
             return int(stream.readline().strip())
 
     def get_firmware_rev(self):
-        """ Returns a firmware revision string, such as 'v8.09' """
+        """Returns a firmware revision string, such as 'v8.09'"""
         if self.simulation:
             return "Leoni fibre switch simulator"
 

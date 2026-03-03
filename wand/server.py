@@ -1,7 +1,8 @@
-import numpy as np
-import time
 import asyncio
 import logging
+import time
+
+import numpy as np
 
 from wand.tools import LaserOwnedException, LockException
 
@@ -31,7 +32,7 @@ def _validate_bool(field, name):
 
 
 class ControlInterface:
-    """ RPC interface to the WAnD server """
+    """RPC interface to the WAnD server"""
 
     def __init__(self, wand_server):
         self._server = wand_server
@@ -48,15 +49,17 @@ class ControlInterface:
 
         current_owner = self._server.laser_db.raw_view[laser]["lock_owner"]
         if current_owner and (current_owner != name):
-            raise LaserOwnedException("Laser currently owned by '{}' "
-                                      "(you are '{}')!"
-                                      .format(current_owner, name))
+            raise LaserOwnedException(
+                "Laser currently owned by '{}' (you are '{}')!".format(
+                    current_owner, name
+                )
+            )
 
         if not self._server.laser_db.raw_view[laser]["host"]:
             raise ValueError("No controller found for '{}'".format(laser))
 
     def ping(self) -> bool:
-        """ Ping the connected wavemeter.
+        """Ping the connected wavemeter.
 
         :return: returns True if in simulation mode or the wavemeter
         is responsive, returns False if the wavemeter returns an error.
@@ -67,9 +70,17 @@ class ControlInterface:
             return True
         return False
 
-    async def get_freq(self, laser, age=0, priority=3, get_osa_trace=False,
-                       blocking=True, mute=False, offset_mode=False):
-        """ Schedule a frequency measurement and, optionally, capture an osa
+    async def get_freq(
+        self,
+        laser,
+        age=0,
+        priority=3,
+        get_osa_trace=False,
+        blocking=True,
+        mute=False,
+        offset_mode=False,
+    ):
+        """Schedule a frequency measurement and, optionally, capture an osa
         trace for a single laser.
 
         :param laser: name of the laser to interrogate
@@ -126,19 +137,22 @@ class ControlInterface:
                 "expiry": expiry,
                 "id": next(self._server.measurement_ids),
                 "get_osa_trace": get_osa_trace,
-                "done": asyncio.Event()}
+                "done": asyncio.Event(),
+            }
             self._server.queue.append(measurement)
             self._server.measurements_queued.set()
 
-            logger.info("measurement task scheduled with id {}".format(
-                measurement["id"]))
+            logger.info(
+                "measurement task scheduled with id {}".format(measurement["id"])
+            )
 
             if not blocking:
                 return measurement["id"]
 
             await measurement["done"].wait()
-            logger.info("measurement task with id {} completed".format(
-                measurement["id"]))
+            logger.info(
+                "measurement task with id {} completed".format(measurement["id"])
+            )
 
             if mute:
                 return measurement["id"]
@@ -155,14 +169,14 @@ class ControlInterface:
         return (status, freq, osa)
 
     def get_measurement_queue(self):
-        """ Returns a list of queued measurements """
+        """Returns a list of queued measurements"""
         queue = [meas.copy() for meas in self._server.queue]
         for meas in queue:
             del meas["done"]  # can't serialise asyncio Events
         return queue
 
     def set_exposure(self, laser, exposure, ccd):
-        """ Sets the exposure time for a laser
+        """Sets the exposure time for a laser
 
         :param laser: name of the laser
         :param exposure: exposure time (ms)
@@ -172,8 +186,7 @@ class ControlInterface:
         exposure = _validate_int(exposure, "exposure")
         ccd = _validate_int(ccd, "ccd")
 
-        if exposure < self._server.exp_min[ccd] or \
-           exposure > self._server.exp_max[ccd]:
+        if exposure < self._server.exp_min[ccd] or exposure > self._server.exp_max[ccd]:
             raise ValueError("invalid exposure")
         if ccd not in range(self._server.num_ccds):
             raise ValueError("invalid WLM CCD number")
@@ -182,7 +195,7 @@ class ControlInterface:
         self._server.save_config_file()
 
     def set_auto_exposure(self, laser, enabled=True):
-        """ Enable or disable auto-exposure for a given laser """
+        """Enable or disable auto-exposure for a given laser"""
         self._validate_laser(laser)
         _validate_bool(enabled, "enabled")
         self._server.laser_db[laser]["auto_exposure"] = enabled
@@ -201,22 +214,22 @@ class ControlInterface:
         return self._server.exp_max
 
     def get_num_wlm_ccds(self):
-        """ Returns the number of CCDs on the WaveLength meter (WLM) """
+        """Returns the number of CCDs on the WaveLength meter (WLM)"""
         return self._server.num_ccds
 
     def get_laser_db(self):
-        """ Returns the laser configuration database """
+        """Returns the laser configuration database"""
         return self._server.laser_db.raw_view
 
     def set_reference_freq(self, laser, f_ref):
-        """ Sets the reference frequency for a laser (Hz) """
+        """Sets the reference frequency for a laser (Hz)"""
         self._validate_laser(laser)
         f_ref = _validate_numeric(f_ref, "f_ref")
         self._server.laser_db[laser]["f_ref"] = f_ref
         self._server.save_config_file()
 
     def set_fast_mode(self, laser, enabled=True):
-        """ Enables or disables fast data acquisition mode for a laser.
+        """Enables or disables fast data acquisition mode for a laser.
 
         This parameter is used by clients to decide how quickly to poll
         the server for data.
@@ -231,7 +244,7 @@ class ControlInterface:
         self._server.save_config_file()
 
     def get_poll_times(self):
-        """ Returns the tuple (poll_time, fast_poll_time).
+        """Returns the tuple (poll_time, fast_poll_time).
 
         These poll times are used by clients, such as the GUI, to determine
         how often to request new data.
@@ -240,7 +253,7 @@ class ControlInterface:
         return (config["poll_time"], config["fast_poll_time"])
 
     def lock(self, laser, set_point=None, name="", timeout=300):
-        """ Locks a laser to the wavemeter.
+        """Locks a laser to the wavemeter.
 
         :param laser: the laser name
         :param set_point: the lock set point (Hz) relative to the laser's
@@ -254,18 +267,20 @@ class ControlInterface:
         self._validate_laser(laser)
         self._check_owner(laser, name)
         set_point = _validate_numeric(set_point, "set_point")
-        timeout = None if timeout is None else _validate_numeric(timeout,
-                                                                 "timeout")
+        timeout = None if timeout is None else _validate_numeric(timeout, "timeout")
 
         if not self._server.laser_db.raw_view[laser]["lock_ready"]:
             raise LockException(
                 "Laser lock not ready. Problem trying to connect to laser "
-                "controller? See the server log for details...")
+                "controller? See the server log for details..."
+            )
 
         for param in ["lock_poll_time", "lock_gain", "lock_capture_range"]:
             if param not in self._server.laser_db.raw_view[laser]:
-                raise LockException(f"Lock parameter '{param}' not configured for " +
-                                    f"laser '{laser}'; cannot engage.")
+                raise LockException(
+                    f"Lock parameter '{param}' not configured for "
+                    + f"laser '{laser}'; cannot engage."
+                )
 
         if set_point is None:
             set_point = self._server.laser_db.raw_view[laser]["lock_set_point"]
@@ -281,7 +296,7 @@ class ControlInterface:
         self._server.wake_locks[laser].set()
 
     def unlock(self, laser, name):
-        """ Unlock and release ownership of a laser """
+        """Unlock and release ownership of a laser"""
         self._validate_laser(laser)
         self._check_owner(laser, name)
 
@@ -293,7 +308,7 @@ class ControlInterface:
         self._server.wake_locks[laser].set()
 
     def steal(self, laser):
-        """ Releases ownership of a laser without changing its lock status.
+        """Releases ownership of a laser without changing its lock status.
 
         Use with caution!
         """
@@ -305,9 +320,8 @@ class ControlInterface:
         self._server.save_config_file()
         self._server.wake_locks[laser].set()
 
-    def set_lock_params(self, laser, gain, poll_time, capture_range=3e9,
-                        name=""):
-        """ Sets the lock parameters for a laser.
+    def set_lock_params(self, laser, gain, poll_time, capture_range=3e9, name=""):
+        """Sets the lock parameters for a laser.
 
         :param gain: the feedback gain to use (V/(Hz*s))
         :param poll_time: time (s) between lock updates

@@ -1,41 +1,45 @@
-""" Wavelength Analysis 'Nd Display GUI """
+"""Wavelength Analysis 'Nd Display GUI"""
+
 import argparse
+import asyncio
+import atexit
+import functools
 import importlib.resources
 import logging
 import sys
 import traceback
-import asyncio
-import atexit
-import functools
 
-from sipyco.common_args import init_logger_from_args, verbosity_args
-from sipyco.asyncio_tools import atexit_register_coroutine
-from sipyco.sync_struct import Subscriber
-
-from qasync import QEventLoop
-from pyqtgraph import QtGui, QtWidgets
 import pyqtgraph.dockarea as dock
+from pyqtgraph import QtGui, QtWidgets
+from qasync import QEventLoop
+from sipyco.asyncio_tools import atexit_register_coroutine
+from sipyco.common_args import init_logger_from_args, verbosity_args
+from sipyco.sync_struct import Subscriber
 
 from wand.gui import LaserDisplay
 from wand.tools import load_config
-
 
 logger = logging.getLogger(__name__)
 
 
 def get_argparser():
     parser = argparse.ArgumentParser(description="WAnD GUI")
-    parser.add_argument("-n", "--name",
-                        default="test",
-                        help="server name, used to locate configuration file")
-    parser.add_argument("-f", "--log-to-file",
-                        action="store_true",
-                        help="Save log output to file")
-    parser.add_argument("-b", "--backup-dir",
-                        default="",
-                        type=str,
-                        help="directory containing backup copies of "
-                             "configuration files")
+    parser.add_argument(
+        "-n",
+        "--name",
+        default="test",
+        help="server name, used to locate configuration file",
+    )
+    parser.add_argument(
+        "-f", "--log-to-file", action="store_true", help="Save log output to file"
+    )
+    parser.add_argument(
+        "-b",
+        "--backup-dir",
+        default="",
+        type=str,
+        help="directory containing backup copies of configuration files",
+    )
     verbosity_args(parser)
 
     return parser
@@ -51,9 +55,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.exit_request.set()
 
 
-class WandGUI():
+class WandGUI:
     def __init__(self):
-
         self.args = args = get_argparser().parse_args()
         init_logger_from_args(args)
 
@@ -62,11 +65,13 @@ class WandGUI():
             fh.setLevel(logger.getEffectiveLevel())
             logger.addHandler(fh)
             logging.getLogger("qasync").addHandler(fh)
-            sys.excepthook = lambda exc_type, exc_value, exc_traceback: \
-                logger.exception("".join(
-                    traceback.format_exception(exc_type,
-                                               exc_value,
-                                               exc_traceback)))
+            sys.excepthook = lambda exc_type, exc_value, exc_traceback: (
+                logger.exception(
+                    "".join(
+                        traceback.format_exception(exc_type, exc_value, exc_traceback)
+                    )
+                )
+            )
 
         self.config = load_config(args, "_gui")
 
@@ -96,16 +101,16 @@ class WandGUI():
         self.laser_displays = {}
         for row in self.config["layout"]:
             prev = None
-            pos = 'bottom'
+            pos = "bottom"
             for display_name in row:
                 display = LaserDisplay(display_name, self)
                 self.laser_displays.update({display.laser: display})
                 self.area.addDock(display.dock, position=pos, relativeTo=prev)
-                pos = 'right'
+                pos = "right"
                 prev = display.dock
 
     def notifier_cb(self, db, server, mod):
-        """ Called whenever we get new data from a server "notifier" interface.
+        """Called whenever we get new data from a server "notifier" interface.
 
         NB sync_struct takes care of updating the relevant db for us, so all we
         do here is call the relevant GUI update function.
@@ -115,9 +120,9 @@ class WandGUI():
 
         # check we're fully connected to the server before processing updates
         if (
-            not self.subscribers[server]["laser_db"]["connected"] or
-            not self.subscribers[server]["freq_db"]["connected"] or
-            not self.subscribers[server]["osa_db"]["connected"]
+            not self.subscribers[server]["laser_db"]["connected"]
+            or not self.subscribers[server]["freq_db"]["connected"]
+            or not self.subscribers[server]["osa_db"]["connected"]
         ):
             return
 
@@ -155,8 +160,9 @@ class WandGUI():
             elif db == "laser_db":
                 if mod["key"] == "f_ref":
                     self.laser_displays[laser].update_reference()
-                elif (mod["key"] == "exposure" or
-                      (len(mod["path"]) > 1 and mod["path"][1] == "exposure")):
+                elif mod["key"] == "exposure" or (
+                    len(mod["path"]) > 1 and mod["path"][1] == "exposure"
+                ):
                     self.laser_displays[laser].update_exposure()
                 elif mod["key"] == "fast_mode":
                     self.laser_displays[laser].update_fast_mode()
@@ -167,11 +173,10 @@ class WandGUI():
             else:
                 raise ValueError("Unexpected notifier interface")
         else:
-            raise ValueError("Unexpected 'notifier' modification: {}"
-                             .format(mod))
+            raise ValueError("Unexpected 'notifier' modification: {}".format(mod))
 
     def start(self):
-        """ Connect to the WaND servers """
+        """Connect to the WaND servers"""
 
         def init_cb(db, mod):
             db.update(mod)
@@ -192,24 +197,22 @@ class WandGUI():
                 return
 
             def make_fut(self, server, db):
-                fut = asyncio.ensure_future(
-                    subscriber_reconnect(self, server, db))
+                fut = asyncio.ensure_future(subscriber_reconnect(self, server, db))
                 self.subscribers[server][db]["connected"] = False
                 self.subscribers[server][db]["future"] = fut
 
-            subscriber.disconnect_cb = functools.partial(
-                make_fut, self, server, db)
+            subscriber.disconnect_cb = functools.partial(make_fut, self, server, db)
 
             while not self.win.exit_request.is_set():
                 try:
-                    await subscriber.connect(server_cfg["host"],
-                                             server_cfg["notify"])
+                    await subscriber.connect(server_cfg["host"], server_cfg["notify"])
 
                     logger.info("Reconnected to server '{}'".format(server))
                     break
                 except OSError:
-                    logger.info("could not connect to '{}' retry in 10s..."
-                                .format(server))
+                    logger.info(
+                        "could not connect to '{}' retry in 10s...".format(server)
+                    )
                     await asyncio.sleep(10)
 
         for server, server_cfg in self.config["servers"].items():
@@ -220,39 +223,39 @@ class WandGUI():
             subscriber = Subscriber(
                 "laser_db",
                 functools.partial(init_cb, self.laser_db),
-                functools.partial(self.notifier_cb, "laser_db", server))
-            fut = asyncio.ensure_future(
-                subscriber_reconnect(self, server, "laser_db"))
+                functools.partial(self.notifier_cb, "laser_db", server),
+            )
+            fut = asyncio.ensure_future(subscriber_reconnect(self, server, "laser_db"))
             self.subscribers[server]["laser_db"] = {
                 "subscriber": subscriber,
                 "connected": False,
-                "future": fut
+                "future": fut,
             }
 
             # ask the servers to keep us updated with the latest frequency data
             subscriber = Subscriber(
                 "freq_db",
                 functools.partial(init_cb, self.freq_db),
-                functools.partial(self.notifier_cb, "freq_db", server))
-            fut = asyncio.ensure_future(
-                subscriber_reconnect(self, server, "freq_db"))
+                functools.partial(self.notifier_cb, "freq_db", server),
+            )
+            fut = asyncio.ensure_future(subscriber_reconnect(self, server, "freq_db"))
             self.subscribers[server]["freq_db"] = {
                 "subscriber": subscriber,
                 "connected": False,
-                "future": fut
+                "future": fut,
             }
 
             # ask the servers to keep us updated with the latest osa traces
             subscriber = Subscriber(
                 "osa_db",
                 functools.partial(init_cb, self.osa_db),
-                functools.partial(self.notifier_cb, "osa_db", server))
-            fut = asyncio.ensure_future(
-                subscriber_reconnect(self, server, "osa_db"))
+                functools.partial(self.notifier_cb, "osa_db", server),
+            )
+            fut = asyncio.ensure_future(subscriber_reconnect(self, server, "osa_db"))
             self.subscribers[server]["osa_db"] = {
                 "subscriber": subscriber,
                 "connected": False,
-                "future": fut
+                "future": fut,
             }
 
         atexit_register_coroutine(self.shutdown)

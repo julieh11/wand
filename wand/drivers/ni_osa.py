@@ -1,7 +1,8 @@
-""" Interface to NI DAQ card(s) that sample OSAs """
+"""Interface to NI DAQ card(s) that sample OSAs"""
+
+from ctypes import byref, c_int32
 
 import numpy as np
-from ctypes import byref, c_int32
 from scipy.signal import decimate
 
 try:
@@ -12,12 +13,13 @@ except ImportError:
 
 
 class OSAException(Exception):
-    """ Raised on errors involving the OSA DAQ card(s) """
+    """Raised on errors involving the OSA DAQ card(s)"""
+
     pass
 
 
 class NiOSA:
-    """ Interface to one or more Optical Spectrum Analyser """
+    """Interface to one or more Optical Spectrum Analyser"""
 
     def __init__(self, osas, simulation=False):
         """
@@ -49,9 +51,11 @@ class NiOSA:
                     "/{}/{}".format(osa["device"], osa["input_channel"]),
                     "Voltage",
                     PyDAQmx.DAQmx_Val_NRSE,
-                    -osa["v_span"] / 2, osa["v_span"] / 2,
+                    -osa["v_span"] / 2,
+                    osa["v_span"] / 2,
                     PyDAQmx.DAQmx_Val_Volts,
-                    None)
+                    None,
+                )
 
                 PyDAQmx.DAQmxCfgSampClkTiming(
                     task_handle,
@@ -59,19 +63,21 @@ class NiOSA:
                     osa["sample_rate"],
                     PyDAQmx.DAQmx_Val_Rising,
                     PyDAQmx.DAQmx_Val_FiniteSamps,
-                    osa["num_samples"])
+                    osa["num_samples"],
+                )
 
                 PyDAQmx.DAQmxCfgDigEdgeStartTrig(
                     task_handle,
                     "/{}/{}".format(osa["device"], osa["trigger_channel"]),
-                    PyDAQmx.DAQmx_Val_Falling)
+                    PyDAQmx.DAQmx_Val_Falling,
+                )
 
         except DAQError as err:
             self.clear()
             raise OSAException(err)
 
     def clear(self):
-        """ Stops and clears all NI DAQ tasks we have created """
+        """Stops and clears all NI DAQ tasks we have created"""
         for name in self.osas.keys():
             task_handle = self.handles.get(name)
             if task_handle is not None:
@@ -82,7 +88,7 @@ class NiOSA:
                     self.handles[name] = None
 
     def get_trace(self, osa, timeout=10):
-        """ Captures and returns an OSA trace.
+        """Captures and returns an OSA trace.
 
         This function is synchronous (blocking) and does not return until the
         measurement is complete.
@@ -99,16 +105,18 @@ class NiOSA:
         read = c_int32()
 
         if self.simulation:
-            x = np.arange(num_samples) - self.f0[osa] \
+            x = (
+                np.arange(num_samples)
+                - self.f0[osa]
                 + np.random.uniform(-0.05, +0.05) * num_samples
+            )
             trace = np.random.normal(loc=0, scale=0.05, size=num_samples)
-            trace += 900. / ((x) ** 2 + 1000)
+            trace += 900.0 / ((x) ** 2 + 1000)
             trace *= config["v_span"] / 2
 
         else:
             task_handle = self.handles[osa]
-            trace = np.zeros((num_samples,),
-                             dtype=np.float64)
+            trace = np.zeros((num_samples,), dtype=np.float64)
             try:
                 PyDAQmx.DAQmxReadAnalogF64(
                     task_handle,
@@ -118,7 +126,8 @@ class NiOSA:
                     trace,
                     num_samples,
                     byref(read),
-                    None)
+                    None,
+                )
             except DAQError as err:
                 self.clear()
                 raise OSAException(err)
