@@ -1,0 +1,59 @@
+[project]
+name = "wand"
+version = "v0.4"
+description = "Wavelength Analysis 'Nd Display"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+
+dependencies = ["numpy>=2.4.2", "sipyco"]
+
+[project.optional-dependencies]
+gui = [
+    "pyqt6>=6.10.2",
+    "pyqtgraph>=0.14.0",
+    # Earlier versions of qasync had horrendous threading issues on Windows, which (for
+    # not entirely obvious reasons) mostly show up on Python 3.10 and up.
+    "qasync>=0.27.1",
+]
+server = [
+    "pydaqmx>=1.4",
+    "scipy>=1.17.1",
+    "toptica-lasersdk>=3.2.0",
+]
+influxdb = [
+    "influxdb>=5.3.2",
+]
+
+[project.scripts]
+wand_server = "wand.frontend.wand_server:main"
+wand_influx_db = "wand.frontend.wand_influx_db:main"
+wand_gui = "wand.frontend.wand_gui:main"
+
+[tool.uv.sources]
+#.Pin SiPyCo to v1.9 for now to avoid PYON v2 fiasco (silent, breaking format change).
+sipyco = { git = "https://github.com/m-labs/sipyco.git", tag = "v1.9" }
+
+[build-system]
+requires = ["uv_build>=0.10.7,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.42.1",
+    "ruff>=0.15.4",
+    "toml>=0.1.0.2",
+]
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.poe.tasks]
+_fmt-imports = "ruff check --select I --fix wand -q"
+_fmt = "ruff format wand"
+fmt.sequence = ["_fmt-imports", "_fmt"]
+
+_fmt-test-imports = "ruff check --select I wand -q"
+_fmt-test = "ruff format --check wand"
+fmt-test.sequence = ["_fmt-test-imports", "_fmt-test"]
+
+lint = "ruff check wand"
