@@ -1,1 +1,47 @@
+{
+    "lasers": {
+    "moglabs_663": {
+        "channel": 1,
 
+        # MOGLabs dDLC network address.
+        # controller IP address or USB/COM identifier.
+        "host": "10.1.1.90",
+        "controller": "moglabs",
+
+        # The adapter maps this pseudo-voltage actuator onto MOGLabs OFFSET.
+        "target": "laser1",
+        "actuator": "piezo:voltage-set",
+
+        # dDLC piezo range used by the adapter.
+        # The adapter maps 0..150 V to OFFSET -100..+100 %.
+        "piezo_full_scale_v": 150.0,
+
+        # Stop the dDLC sweep before WAnD starts steering the offset.
+        "set_span_zero_on_open": True,
+
+        # mode-hop-free region
+        "v_pzt_min": 45.0,
+        "v_pzt_max": 105.0,
+
+        # Target optical frequency:
+        # 4.517872387239e14 Hz == 663.57 nm.
+        "f_ref": 4.517872387239e14,
+        "lock_set_point": 0.0,
+
+        # Initial lock-loop parameters, can une lock_gain sign and magnitude 
+        "lock_gain": 1e-10,
+        "lock_poll_time": 1.0,
+        "lock_capture_range": 2e9,
+
+        # Wavemeter settings
+        "exposure": [10, 10],
+        "auto_exposure": True,
+        "fast_mode": False,
+        "fast_mode_set_at": 0,
+
+        "locked": False,
+        "lock_owner": "",
+        "lock_ready": False,
+    }
+}
+}
