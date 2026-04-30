@@ -237,7 +237,7 @@ class WandServer:
              
                 #dlcpro = DLCpro(NetworkConnection(conf["host"]))
                 #await dlcpro.open()
-            except (DecopError, OSError):
+            except (DecopError, OSError, MOGDLCError):
                 logger.warning(
                     "could not connect to laser '{}', retrying in 60s (lock unavailable)".format(
                         laser
@@ -328,7 +328,7 @@ class WandServer:
 
                     await dlcpro.set(":".join([target, actuator]), v_pzt)
 
-                except OSError:
+                except (OSError, MOGDLCError):
                     logger.warning("Connection to laser '{}' lost".format(laser))
                     self.control_interface.unlock(laser, conf["lock_owner"])
                     await asyncio.sleep(0)
