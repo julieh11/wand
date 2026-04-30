@@ -1,4 +1,12 @@
 {
+  "poll_time": 300,
+    "fast_poll_time": 0.1,
+    "name": "663",
+
+    "switch": {
+        "type": "internal",
+        "dead_time": 0.075
+    },
     "lasers": {
     "moglabs_663": {
         "channel": 1,
@@ -40,6 +48,7 @@
         "fast_mode_set_at": 0,
 
         "locked": False,
+        "locked_at": 0,
         "lock_owner": "",
         "lock_ready": False,
     }
