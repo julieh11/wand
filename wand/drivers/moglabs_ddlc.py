@@ -10,7 +10,8 @@ import re
 import time
 from typing import Callable, Optional, Tuple, Union
 
-from mogdevice import MOGDevice
+#from mogdevice import MOGDevice
+from wand.drivers.mogdevice import MOGDevice
 
 logger = logging.getLogger(__name__)
 
