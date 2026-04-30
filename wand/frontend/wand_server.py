@@ -30,6 +30,8 @@ from sipyco.sync_struct import Notifier, Publisher
 from toptica.lasersdk.asyncio.client import Client as DLCpro
 from toptica.lasersdk.asyncio.client import DecopError, NetworkConnection
 
+from wand.drivers.moglabs_ddlc import MoglabsDLCproCompat, MOGDLCError
+
 from wand.drivers.high_finesse import WLM, WLMException
 from wand.drivers.leoni_switch import LeoniSwitch
 from wand.drivers.ni_osa import NiOSA
@@ -219,8 +221,22 @@ class WandServer:
             conf["lock_ready"] = False
 
             try:
-                dlcpro = DLCpro(NetworkConnection(conf["host"]))
+                controller_type = conf.get("controller", "toptica").lower()
+                if controller_type == "moglabs":
+                    dlcpro = MoglabsDLCproCompat(
+                        conf["host"],
+                        port=conf.get("port"),
+                        timeout=conf.get("timeout", 1.0),
+                        piezo_full_scale_v=conf.get("piezo_full_scale_v", 150.0),
+                        set_span_zero_on_open=conf.get("set_span_zero_on_open", False),
+                    )
+                else:
+                    dlcpro = DLCpro(NetworkConnection(conf["host"]))
+                
                 await dlcpro.open()
+             
+                #dlcpro = DLCpro(NetworkConnection(conf["host"]))
+                #await dlcpro.open()
             except (DecopError, OSError):
                 logger.warning(
                     "could not connect to laser '{}', retrying in 60s (lock unavailable)".format(
