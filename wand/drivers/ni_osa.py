@@ -10,6 +10,8 @@ try:
     from PyDAQmx.DAQmxFunctions import DAQError
 except ImportError:
     pass
+except NotImplementedError:
+    pass
 
 
 class OSAException(Exception):
